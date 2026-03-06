@@ -12,7 +12,7 @@ PORT="${1:-19998}"
 conf="${REMOTE_MAC_CONF:-$HOME/.remote-mac.conf}"
 [ -f "$conf" ] && source "$conf"
 MAC_SSH_HOST="${MAC_SSH_HOST:-mac.local}"
-MAC_SSH_USER="${MAC_SSH_USER:-root}"
+MAC_SSH_USER="${MAC_SSH_USER:-$USER}"
 MAC_SSH_PORT="${MAC_SSH_PORT:-22}"
 
 SSH_CMD="ssh -p ${MAC_SSH_PORT} -o ConnectTimeout=5 -o BatchMode=yes ${MAC_SSH_USER}@${MAC_SSH_HOST}"

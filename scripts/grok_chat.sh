@@ -24,7 +24,7 @@ done
 conf="${REMOTE_MAC_CONF:-$HOME/.remote-mac.conf}"
 [ -f "$conf" ] && source "$conf"
 MAC_SSH_HOST="${MAC_SSH_HOST:-mac.local}"
-MAC_SSH_USER="${MAC_SSH_USER:-root}"
+MAC_SSH_USER="${MAC_SSH_USER:-$USER}"
 MAC_SSH_PORT="${MAC_SSH_PORT:-22}"
 MAC_IP="${MAC_SSH_HOST}"
 BRIDGE_PORT=19998

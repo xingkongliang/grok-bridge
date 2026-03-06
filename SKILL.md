@@ -23,7 +23,7 @@ bash skills/our/grok-bridge/scripts/grok_chat.sh "你的问题" --mode expert
 bash skills/our/grok-bridge/scripts/start_bridge.sh
 
 # 调用
-curl -s -X POST http://100.92.28.97:19998/chat \
+curl -s -X POST http://YOUR_MAC_IP:19998/chat \
   -H 'Content-Type: application/json' \
   -d '{"prompt":"你的问题","mode":"auto"}'
 ```
