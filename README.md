@@ -1,125 +1,73 @@
-# 🌉 Grok Bridge
+# 🌉 grok-bridge v2.0
 
-Turn [SuperGrok](https://grok.com) into a REST API — let your AI agents use Grok for free via Safari browser automation.
+Turn **SuperGrok** into a command-line tool. No API key needed.
 
-## How it Works
+## How it works
 
 ```
-Your Agent → HTTP POST → Grok Bridge (Mac) → Safari → grok.com → Response
+Your Terminal → Safari JS injection → grok.com → Response extracted via DOM
 ```
 
-Grok Bridge runs on macOS, automating Safari's SuperGrok tab via JavaScript injection (osascript) or [Peekaboo](https://github.com/steipete/peekaboo) UI automation as fallback.
+1. Opens a new conversation on `grok.com` via `osascript`
+2. Pastes your prompt using `pbcopy` + `Cmd+V` (works with React controlled inputs)
+3. Presses Return via System Events
+4. Polls `document.body.innerText` until response stabilizes
+5. Extracts and outputs Grok's reply
 
 ## Quick Start
 
-### One-liner (SSH mode, no server needed)
 ```bash
-bash grok_chat.sh "What is eBPF?" --mode expert
+# Local (on Mac)
+bash scripts/grok_chat.sh "What is the mass of the sun?"
+
+# Remote (from any machine via SSH)
+MAC_SSH="ssh user@your-mac" bash scripts/grok_chat.sh "Explain quantum tunneling"
+
+# With options
+bash scripts/grok_chat.sh "Write a haiku" --timeout 90 --screenshot
 ```
-
-### REST API Server
-```bash
-# Start the bridge on your Mac
-python3 grok_bridge.py --port 19998
-
-# Call from anywhere
-curl -X POST http://localhost:19998/chat \
-  -H 'Content-Type: application/json' \
-  -d '{"prompt": "Explain quantum computing", "mode": "auto"}'
-```
-
-## API Reference
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/modes` | GET | List available modes |
-| `/chat` | POST | Send prompt, get response |
-| `/new` | POST | Start new conversation |
-
-### POST /chat
-```json
-{
-  "prompt": "Your question here",
-  "mode": "auto",       // auto|fast|expert|heavy
-  "timeout": 120        // seconds
-}
-```
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "response": "Grok's answer..."
-}
-```
-
-## Grok Modes
-
-| Mode | Best For | Speed |
-|------|----------|-------|
-| `auto` | General use | Medium |
-| `fast` | Simple questions | Fast |
-| `expert` | Deep analysis | Slow |
-| `heavy` | Complex reasoning | Slowest |
 
 ## Requirements
 
-- macOS 13+
-- Safari with active SuperGrok login (grok.com)
-- Safari → Develop menu → "Allow JavaScript from Apple Events" ✅
-- Python 3.9+
-- Optional: [Peekaboo](https://github.com/steipete/peekaboo) for UI automation fallback
+- macOS with Safari
+- Logged into [grok.com](https://grok.com) (free or SuperGrok)
+- System Events permission (Accessibility) for keystroke simulation
+- For remote use: SSH access to your Mac
 
-## Installation
+## v2 vs v1
 
-```bash
-git clone https://github.com/ythx-101/grok-bridge.git
-cd grok-bridge
-
-# Option 1: Run the server
-python3 scripts/grok_bridge.py --port 19998
-
-# Option 2: Use the shell script directly
-bash scripts/grok_chat.sh "Hello Grok"
-```
+| | v1 | v2 |
+|---|---|---|
+| Input method | Peekaboo UI automation | pbcopy + Cmd+V (System Events) |
+| Speed | ~30s per query | ~3s injection |
+| Dependencies | Peekaboo (Homebrew) | None (pure macOS) |
+| Reliability | Fragile (UI element detection) | Robust (DOM + clipboard) |
+| React compat | ❌ JS setValue doesn't trigger React | ✅ Real paste event works |
 
 ## Architecture
 
 ```
-┌─────────────┐     SSH/HTTP      ┌──────────────┐
-│  VPS Agent  │ ──────────────── │  Mac (Bridge) │
-│  (Caller)   │                   │               │
-└─────────────┘                   │  ┌──────────┐ │
-                                  │  │ Safari   │ │
-                                  │  │ grok.com │ │
-                                  │  └──────────┘ │
-                                  │       ↑       │
-                                  │  osascript JS │
-                                  │  or Peekaboo  │
-                                  └──────────────┘
+┌──────────────┐     SSH/local      ┌──────────────┐
+│  Your CLI    │ ──────────────────→ │   macOS      │
+│  (anywhere)  │                     │              │
+└──────────────┘                     │  osascript   │
+                                     │  ↓           │
+                                     │  Safari      │
+                                     │  ↓           │
+                                     │  grok.com    │
+                                     │  ↓           │
+                                     │  DOM poll    │
+                                     │  ↓           │
+                                     │  Response    │
+                                     └──────────────┘
 ```
 
-## Integration with OpenClaw
+## Key Insight
 
-This bridge was designed to work with [OpenClaw](https://openclaw.ai) AI agents:
-
-```bash
-# In your agent's dispatch.sh
-bash dispatch.sh --agent grok --task "Analyze this code for security issues"
-```
-
-## Limitations
-
-- Single tab, no concurrency (one request at a time)
-- Depends on SuperGrok web DOM (may need updates after UI changes)
-- Requires active Safari login session
-- macOS only (Safari automation)
+React controlled `<textarea>` ignores JavaScript `value` setter + `input` event.
+The only reliable way: **real clipboard paste** (`pbcopy` + `Cmd+V` via System Events).
+This is what v2 does — zero extra dependencies, just macOS built-ins.
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
-
-## Credits
-
-Built by [小灵 🦞](https://github.com/ythx-101) as part of the OpenClaw ecosystem.
+MIT
