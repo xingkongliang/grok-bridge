@@ -1,72 +1,105 @@
-# 🌉 grok-bridge v2.0
+# 🌉 grok-bridge v3.0
 
-Turn **SuperGrok** into a command-line tool. No API key needed.
+Turn **SuperGrok** into a REST API + CLI tool. No API key needed.
 
 ## How it works
 
 ```
-Your Terminal → Safari JS injection → grok.com → Response extracted via DOM
+Your Terminal/Script → Safari JS injection → grok.com → Response extracted via DOM
 ```
 
-1. Opens a new conversation on `grok.com` via `osascript`
-2. Pastes your prompt using `pbcopy` + `Cmd+V` (works with React controlled inputs)
-3. Presses Return via System Events
-4. Polls `document.body.innerText` until response stabilizes
-5. Extracts and outputs Grok's reply
+Two modes:
 
-## Quick Start
-
+### REST API (recommended)
 ```bash
-# Local (on Mac)
-bash scripts/grok_chat.sh "What is the mass of the sun?"
+# Start the server on your Mac
+python3 scripts/grok_bridge.py --port 19998
 
-# Remote (from any machine via SSH)
-MAC_SSH="ssh user@your-mac" bash scripts/grok_chat.sh "Explain quantum tunneling"
+# Query from anywhere
+curl -X POST http://your-mac:19998/chat \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"What is the mass of the sun?","timeout":60}'
 
-# With options
-bash scripts/grok_chat.sh "Write a haiku" --timeout 90 --screenshot
+# Health check
+curl http://your-mac:19998/health
+
+# Read current conversation
+curl http://your-mac:19998/history
+```
+
+### CLI (legacy)
+```bash
+# Local
+bash scripts/grok_chat.sh "Explain quantum tunneling"
+
+# Remote via SSH
+MAC_SSH="ssh user@your-mac" bash scripts/grok_chat.sh "Write a haiku" --timeout 90
 ```
 
 ## Requirements
 
 - macOS with Safari
 - Logged into [grok.com](https://grok.com) (free or SuperGrok)
-- System Events permission (Accessibility) for keystroke simulation
-- For remote use: SSH access to your Mac
+- Safari > Settings > Advanced > Show features for web developers ✓
+- Safari > Develop > Allow JavaScript from Apple Events ✓
+- **No Accessibility permission needed** (v3 uses JS injection, not System Events)
 
-## v2 vs v1
+## API Endpoints
 
-| | v1 | v2 |
-|---|---|---|
-| Input method | Peekaboo UI automation | pbcopy + Cmd+V (System Events) |
-| Speed | ~30s per query | ~3s injection |
-| Dependencies | Peekaboo (Homebrew) | None (pure macOS) |
-| Reliability | Fragile (UI element detection) | Robust (DOM + clipboard) |
-| React compat | ❌ JS setValue doesn't trigger React | ✅ Real paste event works |
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/chat` | Send prompt, wait for response |
+| POST | `/new` | Start new conversation |
+| GET | `/health` | Health check (Safari URL, grok status) |
+| GET | `/history` | Read current page conversation |
+
+## Version History
+
+| | v1 | v2 | v3 |
+|---|---|---|---|
+| Input | Peekaboo UI | pbcopy + Cmd+V | JS `execCommand('insertText')` |
+| Submit | UI click | System Events Return | JS `button.click()` |
+| Permissions | Peekaboo + Accessibility | Accessibility | **None** (pure JS injection) |
+| Interface | CLI only | CLI only | **REST API** + CLI |
+| Dependencies | Peekaboo (brew) | None | None (stdlib only) |
+| Speed | ~30s | ~3s | ~3s |
 
 ## Architecture
 
 ```
-┌──────────────┐     SSH/local      ┌──────────────┐
-│  Your CLI    │ ──────────────────→ │   macOS      │
-│  (anywhere)  │                     │              │
-└──────────────┘                     │  osascript   │
-                                     │  ↓           │
-                                     │  Safari      │
-                                     │  ↓           │
-                                     │  grok.com    │
-                                     │  ↓           │
-                                     │  DOM poll    │
-                                     │  ↓           │
-                                     │  Response    │
-                                     └──────────────┘
+┌──────────────┐                     ┌───────────────────────┐
+│  HTTP Client │  POST /chat         │      macOS            │
+│  (anywhere)  │ ──────────────────→ │                       │
+└──────────────┘                     │  grok_bridge.py       │
+                                     │  ↓ osascript          │
+                                     │  Safari do JavaScript │
+                                     │  ↓ execCommand        │
+                                     │  grok.com textarea    │
+                                     │  ↓ button.click()     │
+                                     │  Grok responds        │
+                                     │  ↓ DOM poll           │
+                                     │  Response extracted   │
+                                     └───────────────────────┘
 ```
 
-## Key Insight
+## Key Insight (v3)
 
-React controlled `<textarea>` ignores JavaScript `value` setter + `input` event.
-The only reliable way: **real clipboard paste** (`pbcopy` + `Cmd+V` via System Events).
-This is what v2 does — zero extra dependencies, just macOS built-ins.
+React controlled inputs ignore JavaScript `value` setter, synthetic `InputEvent`, and even `nativeInputValueSetter`.
+
+What **doesn't** work from SSH:
+- ❌ `osascript keystroke` — blocked by macOS Accessibility
+- ❌ CGEvent (Swift) — HID events don't reach web content
+- ❌ JS `InputEvent` / `nativeInputValueSetter` — React ignores synthetic events
+
+What **does** work:
+- ✅ `document.execCommand('insertText')` — triggers real input in the browser
+- ✅ JS `button.click()` on Send button — no System Events needed
+
+Zero permissions, zero dependencies, pure JavaScript injection via AppleScript.
+
+## Credits
+
+v3 architecture designed by Claude Opus 4.6 (via [Antigravity](https://antigravity.so)), System Events bypass by 小灵 🦞.
 
 ## License
 
