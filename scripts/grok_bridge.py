@@ -17,6 +17,7 @@ import argparse
 import subprocess
 import secrets
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import unquote
 from socketserver import ThreadingMixIn
 
 GROK_URL = "https://grok.com"
@@ -272,6 +273,7 @@ class GrokBridge:
                 return {"status": "error", "error": "input element not found"}
 
             msg_count_before = self._count_messages()
+            response_before = self._get_last_response()
             if not self._type_and_send(prompt, input_sel):
                 return {"status": "error", "error": "failed to send prompt"}
 
@@ -293,8 +295,8 @@ class GrokBridge:
                     if not response_detected:
                         if new_count > msg_count_before or msg_count_before < 0:
                             response_detected = True
-                        elif time.time() - start > 8:
-                            # After 8s, accept DOM response even if count unchanged
+                        elif response != response_before:
+                            # Content changed from before send — new response
                             response_detected = True
 
                     if not response_detected:
@@ -394,7 +396,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                     for p in self.path.split("?", 1)[1].split("&")
                     if "=" in p
                 )
-                provided = params.get("token", "")
+                provided = unquote(params.get("token", ""))
         if secrets.compare_digest(provided, auth_token):
             return True
         self._json_response(401, {"status": "error", "error": "unauthorized"})
