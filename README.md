@@ -1,4 +1,4 @@
-# 🌉 grok-bridge v3.0
+# grok-bridge v3.1
 
 Turn **SuperGrok** into a REST API + CLI tool. No API key needed.
 
@@ -8,33 +8,63 @@ Turn **SuperGrok** into a REST API + CLI tool. No API key needed.
 Your Terminal/Script → Safari JS injection → grok.com → Response extracted via DOM
 ```
 
-Two modes:
+## Quick Start
 
-### REST API (recommended)
+### 1. Start the server (on Mac)
 ```bash
-# Start the server on your Mac
 python3 scripts/grok_bridge.py --port 19998
 
-# Query from anywhere
-curl -X POST http://your-mac:19998/chat \
+# With authentication (recommended for LAN)
+python3 scripts/grok_bridge.py --port 19998 --host 0.0.0.0 --token mysecret
+```
+
+### 2. Send requests
+```bash
+# Chat
+curl -X POST http://localhost:19998/chat \
   -H "Content-Type: application/json" \
   -d '{"prompt":"What is the mass of the sun?","timeout":60}'
 
+# With auth
+curl -X POST http://localhost:19998/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer mysecret" \
+  -d '{"prompt":"Hello","timeout":60}'
+
 # Health check
-curl http://your-mac:19998/health
+curl http://localhost:19998/health
 
 # Read current conversation
-curl http://your-mac:19998/history
+curl http://localhost:19998/history
+
+# New conversation
+curl -X POST http://localhost:19998/new
 ```
 
-### CLI (legacy)
+### 3. CLI wrapper
 ```bash
-# Local
 bash scripts/grok_chat.sh "Explain quantum tunneling"
-
-# Remote via SSH
-MAC_SSH="ssh user@your-mac" bash scripts/grok_chat.sh "Write a haiku" --timeout 90
+bash scripts/grok_chat.sh "Hello" --timeout 60 --token mysecret
 ```
+
+## Server Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port` | 19998 | Listen port |
+| `--host` | 127.0.0.1 | Bind address (`0.0.0.0` for LAN access) |
+| `--token` | (none) | Bearer token for authentication |
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/chat` | Send prompt, wait for response. Body: `{"prompt":"...", "timeout":120}` |
+| POST | `/new` | Start new conversation (waits until input ready) |
+| GET | `/health` | Health check (Safari URL, input availability) |
+| GET | `/history` | Read current page conversation |
+
+Authentication: pass `Authorization: Bearer <token>` header or `?token=<token>` query param.
 
 ## Requirements
 
@@ -42,27 +72,6 @@ MAC_SSH="ssh user@your-mac" bash scripts/grok_chat.sh "Write a haiku" --timeout 
 - Logged into [grok.com](https://grok.com) (free or SuperGrok)
 - Safari > Settings > Advanced > Show features for web developers ✓
 - Safari > Develop > Allow JavaScript from Apple Events ✓
-- **No Accessibility permission needed** (v3 uses JS injection, not System Events)
-
-## API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/chat` | Send prompt, wait for response |
-| POST | `/new` | Start new conversation |
-| GET | `/health` | Health check (Safari URL, grok status) |
-| GET | `/history` | Read current page conversation |
-
-## Version History
-
-| | v1 | v2 | v3 |
-|---|---|---|---|
-| Input | Peekaboo UI | pbcopy + Cmd+V | JS `execCommand('insertText')` |
-| Submit | UI click | System Events Return | JS `button.click()` |
-| Permissions | Peekaboo + Accessibility | Accessibility | **None** (pure JS injection) |
-| Interface | CLI only | CLI only | **REST API** + CLI |
-| Dependencies | Peekaboo (brew) | None | None (stdlib only) |
-| Speed | ~30s | ~3s | ~3s |
 
 ## Architecture
 
@@ -80,26 +89,24 @@ MAC_SSH="ssh user@your-mac" bash scripts/grok_chat.sh "Write a haiku" --timeout 
                                      │  ↓ DOM poll           │
                                      │  Response extracted   │
                                      └───────────────────────┘
+
+┌──────────────┐                     ┌───────────────────────┐
+│ grok_chat.sh │  curl POST /chat    │  grok_bridge.py       │
+│  (CLI)       │ ──────────────────→ │  (must be running)    │
+└──────────────┘                     └───────────────────────┘
 ```
 
-## Key Insight (v3)
+## v3.1 Changes
 
-React controlled inputs ignore JavaScript `value` setter, synthetic `InputEvent`, and even `nativeInputValueSetter`.
-
-What **doesn't** work from SSH:
-- ❌ `osascript keystroke` — blocked by macOS Accessibility
-- ❌ CGEvent (Swift) — HID events don't reach web content
-- ❌ JS `InputEvent` / `nativeInputValueSetter` — React ignores synthetic events
-
-What **does** work:
-- ✅ `document.execCommand('insertText')` — triggers real input in the browser
-- ✅ JS `button.click()` on Send button — no System Events needed
-
-Zero permissions, zero dependencies, pure JavaScript injection via AppleScript.
-
-## Credits
-
-v3 architecture designed by Claude Opus 4.6 (via [Antigravity](https://antigravity.so)), System Events bypass by 小灵 🦞.
+- **DOM-based response extraction**: uses message element selectors instead of full-page text splitting
+- **Generation detection**: checks stop button / spinner / send button state to know when Grok is done
+- **Authentication**: optional `--token` flag for bearer token auth
+- **Bind control**: `--host` flag, defaults to `127.0.0.1` (was `0.0.0.0`)
+- **Request validation**: checks for empty prompts, invalid JSON, timeout bounds
+- **`/new` waits for readiness**: verifies input is available before returning success
+- **`/health` diagnostics**: reports input availability in addition to URL
+- **CLI simplified**: `grok_chat.sh` is now a thin REST client (no more Swift CGEvent helper)
+- **Code quality**: readable names, explicit error handling, no bare `except`
 
 ## License
 
