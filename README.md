@@ -1,4 +1,4 @@
-# grok-bridge v3.1
+# grok-bridge v3.2
 
 Turn **SuperGrok** into a REST API + CLI tool. No API key needed.
 
@@ -7,6 +7,8 @@ Turn **SuperGrok** into a REST API + CLI tool. No API key needed.
 ```
 Your Terminal/Script → Safari JS injection → grok.com → Response extracted via DOM
 ```
+
+The bridge **pins a dedicated grok.com tab** (first tab found by URL across all Safari windows; created in the background if missing) and **never activates Safari** — it works in a background tab while you use other apps or browse other tabs. Keep only one grok.com tab open so the right one gets pinned.
 
 ## Quick Start
 
@@ -95,6 +97,15 @@ Authentication: pass `Authorization: Bearer <token>` header or `?token=<token>` 
 │  (CLI)       │ ──────────────────→ │  (must be running)    │
 └──────────────┘                     └───────────────────────┘
 ```
+
+## v3.2 Changes
+
+- **Pinned tab**: targets the first grok.com tab by URL instead of "current tab of front window" — switching tabs or windows no longer breaks requests
+- **No focus stealing**: Safari is never activated; typing/sending works in a hidden background tab (one-time fallback switches Safari's current tab if a hidden tab rejects input — app focus is still untouched)
+- **`/new` serialized**: shares the chat lock, so it can no longer navigate away mid-request
+- **Composer fix**: grok.com's input is now a Tiptap/ProseMirror contenteditable (the page's bare `<textarea>` silently ignores input) — selector order updated, and sends are verified/aborted instead of fired blind
+- **Code fences preserved**: code blocks come back as ` ``` ` fenced text with the language tag taken from the block header
+- **Diagnostics**: `scripts/probe_dom.py` (selector health) and `scripts/smoke_test.sh` (end-to-end check)
 
 ## v3.1 Changes
 
