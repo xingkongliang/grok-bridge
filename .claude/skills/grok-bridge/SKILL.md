@@ -43,16 +43,34 @@ If you get a JSON response with `"status": "ok"`, the server is up — skip to t
 
 ## Starting the server
 
-The server script is at `scripts/grok_bridge.py` relative to this SKILL.md file's directory. It uses Python stdlib only — no pip install needed. Use the directory containing this SKILL.md as the base path.
+⛔ **Never run a filesystem-wide `find` / `mdfind` / `ls -R` to locate the script.**
+On macOS that walks Documents, Desktop, Photos and iCloud Drive, and fires a burst of
+privacy-permission dialogs at whoever is at the keyboard. If the two steps below do not
+find it, **stop and ask the user where the grok-bridge checkout is.**
+
+⚠️ `scripts/` is **not** deployed next to this SKILL.md — skill installers copy this file
+alone. Do not resolve the script relative to this SKILL.md's directory.
+
+**Step 1 — is it already a managed service?** On a host where it is set up as one, the
+bridge is always up and you should never start it by hand. Restart it with:
 
 ```bash
-# SKILL_DIR = directory containing this SKILL.md (resolve before use)
+# macOS (launchd agent, label ai.grok-bridge)
+launchctl kickstart -k gui/$(id -u)/ai.grok-bridge && sleep 5 && curl -s -m 10 http://localhost:19998/health
+```
 
-# Local only (default)
-python3 <SKILL_DIR>/scripts/grok_bridge.py --port 19998
+**Step 2 — otherwise, run it from the repo checkout.** Try the conventional location
+once; if it is not there, ask the user rather than searching:
+
+```bash
+GROK_BRIDGE=~/Work/personal/tools/cli/grok-bridge/scripts/grok_bridge.py
+[ -f "$GROK_BRIDGE" ] || { echo "ask the user for the grok-bridge repo path"; }
+
+# Local only (default). Python stdlib only — no pip install needed.
+python3 "$GROK_BRIDGE" --port 19998
 
 # LAN access with auth (for remote machines via Tailscale etc.)
-python3 <SKILL_DIR>/scripts/grok_bridge.py --port 19998 --host 0.0.0.0 --token <secret>
+python3 "$GROK_BRIDGE" --port 19998 --host 0.0.0.0 --token <secret>
 ```
 
 Server options:
@@ -60,10 +78,9 @@ Server options:
 - `--host` (default 127.0.0.1) — bind address, use `0.0.0.0` for LAN
 - `--token` (optional) — bearer token for authentication
 
-Run in background if the user wants it persistent:
-```bash
-nohup python3 <SKILL_DIR>/scripts/grok_bridge.py --port 19998 > /tmp/grok-bridge.log 2>&1 &
-```
+If the user wants it persistent, set it up as a launchd agent (see Step 1) rather than
+backgrounding it from an agent session: a launchd agent restarts on crash and at login,
+and does not depend on whichever agent session happened to start it.
 
 ## API Endpoints
 
